@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Marigold Path - Día de los Muertos</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Georgia', serif;
+            background: linear-gradient(180deg, #1a0a2e 0%, #3d2463 50%, #5c3d7a 100%);
+            cursor: default;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .petal-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: rgba(255, 200, 50, 0.95);
+            padding: 3rem;
+            border-radius: 50%;
+            width: 400px;
+            height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1.3rem;
+            line-height: 1.6;
+            color: #2d1b4e;
+            box-shadow: 0 0 60px rgba(255, 200, 50, 0.6);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            pointer-events: none;
+        }
+
+        .petal-message.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+
+        .petal-message p {
+            font-style: italic;
+        }
+
+        .intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(26, 10, 46, 0.95);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            overflow-y: auto;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        .intro-screen.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .intro-content {
+            max-width: 700px;
+            text-align: center;
+            color: #f5e6d3;
+        }
+
+        .intro-content h1 {
+            font-size: 2.5rem;
+            color: #ffc832;
+            margin-bottom: 2rem;
+            font-weight: normal;
+        }
+
+        .intro-content p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .intro-content .signature {
+            text-align: right;
+            font-style: italic;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .start-button {
+            background: rgba(255, 200, 50, 0.9);
+            color: #2d1b4e;
+            border: none;
+            padding: 1.5rem 3rem;
+            font-size: 1.3rem;
+            font-family: 'Georgia', serif;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 40px rgba(255, 200, 50, 0.5);
+            transition: all 0.3s ease;
+            margin-top: 1rem;
+        }
+
+        .start-button:hover {
+            background: rgba(255, 220, 80, 1);
+            box-shadow: 0 0 60px rgba(255, 200, 50, 0.8);
+            transform: scale(1.05);
+        }
+
+        @media (max-width: 768px) {
+            .petal-message {
+                width: 300px;
+                height: 300px;
+                padding: 2rem;
+                font-size: 1.1rem;
+            }
+            
+            .intro-content h1 {
+                font-size: 2rem;
+            }
+            
+            .intro-content p {
+                font-size: 1rem;
+            }
+            
+            .start-button {
+                padding: 1.2rem 2.5rem;
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div class="petal-message" id="petalMessage"></div>
+    <div class="intro-screen" id="introScreen">
+        <div class="intro-content">
+            <h1>Memoria Picada: Pixelada</h1>
+            <p>This is my ofrenda for the 2025 Día de los Muertos celebrations. A while ago, shortly after my brother died, I anonymously asked strangers from around the world to offer memories of their loved ones. I've held onto their words in the intervening years, reminding me of the absences we all carry. Like the papel picado banners you see hung around Mexican homes during this time, the beautiful punctures in our lives now let the light through differently. They reveal fragments of memory: the small, specific moments that make someone irreplaceable. This piece is a meditation on what remains and what is missing, on celebrating those we love by honoring the shape of their absence. May all the holes in your corazón be shaped like joy.</p>
+            <p class="signature">David Nuñez, November 1, 2025</p>
+            <button class="start-button" id="startButton">Enter</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const petalMessageEl = document.getElementById('petalMessage');
+        const introScreen = document.getElementById('introScreen');
+        const startButton = document.getElementById('startButton');
+
+        let audioContext;
+        let musicGain, ambienceGain;
+        let started = false;
+
+        // Ensure intro screen is visible on load
+        introScreen.classList.remove('hidden');
+
+        // Canvas setup
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Messages for the petals - mix of memories and reflections
+        const messages = [
+            "He laughed at the way I laughed",
+            "We sang about billy goats together",
+            "She always burned the tamales",
+            "His laugh could fill a whole room",
+            "Love doesn't end at the edges of life",
+            "She wore that perfume every single day",
+            "He never missed Sunday dinner",
+            "They live on in every story we tell",
+            "Her garden was her pride and joy",
+            "He taught me how to dance",
+            "Death is not the opposite of life, but a part of it",
+            "She made the sign of the cross before every meal",
+            "His hands were always working",
+            "Remember me with laughter, not tears",
+            "She sang while cooking, always off-key",
+            "He could fix anything with duct tape and prayer",
+            "The marigolds light the way home",
+            "She kept every letter I ever sent her",
+            "He fell asleep in his chair every evening at 8",
+            "In every sunrise, they walk beside us",
+            "Her hugs could heal anything",
+            "He always had a story about the old days",
+            "Memories are the flowers that never fade",
+            "She made the best café de olla",
+            "His mustache tickled when he kissed my forehead",
+            "They taught us how to live; now they teach us how to remember",
+            "She kept pennies in her apron pocket",
+            "He whistled the same tune every morning",
+            "A life lived with love is never truly gone",
+            "Her hands smelled like masa and vanilla",
+            "He wore that hat until it fell apart",
+            "The veil is thin, but the connection is strong",
+            "She called everyone 'mija' or 'mijo'",
+            "His toolbox was more organized than his desk",
+            "Celebrate the dance, not mourn the music's end",
+            "She saved the good china for no one in particular",
+            "He knew every neighbor's name and birthday",
+            "Their laughter echoes in our joy",
+            "She grew herbs on every windowsill",
+            "He gave the best advice, usually unsolicited",
+            "Every meal shared is a reunion",
+            "Her rosary beads were worn smooth",
+            "He told the same jokes every holiday",
+            "Death is only a horizon, and a horizon is just the limit of our sight",
+            "She folded laundry like it was meditation",
+            "His workshop smelled like sawdust and coffee",
+            "The sweetness of life is in its brevity",
+            "She wrote everything down in a little notebook",
+            "He always gave the first and last bite to others",
+            "They are the stars we navigate by",
+            "Her smile lines told a thousand stories",
+            "He woke up before dawn every single day",
+            "In loving memory, we find eternal presence",
+            "She made everyone feel like family",
+            "His hugs lasted just a little too long",
+            "The altar we build is in our hearts",
+            "She kept photos in every drawer",
+            "He hummed while he shaved",
+            "Time passes, but love remains",
+            "Her curtains were always freshly ironed",
+            "He saved twist ties and rubber bands, just in case",
+            "Gone from our sight, but never from our hearts",
+            "She knew when you were lying",
+            "He carved wood with infinite patience",
+            "I can still hear her voice saying my name",
+            "His hands were calloused but gentle",
+            "She made everything from scratch",
+            "He always had a pocketknife and a piece of gum",
+            "Her kitchen was the heart of the house",
+            "He taught me constellations on summer nights",
+            "She embroidered flowers on everything",
+            "His stories got taller every year",
+            "She could make a feast from almost nothing",
+            "He never raised his voice except to laugh",
+            "Her faith was quiet but unshakeable",
+            "He walked the same route every single morning",
+            "She noticed everything, forgot nothing",
+            "His hands were always dirty from the garden",
+            "She wore red lipstick even to the grocery store",
+            "He fixed my bike tire without being asked",
+            "Her arroz con leche was legendary",
+            "His pickup truck ran on hope and stubbornness",
+            "She kept a candle lit in the window",
+            "He knew every bird by its song",
+            "Her tortillas were perfect circles",
+            "He called me 'champion' even when I lost",
+            "She pressed flowers between book pages",
+            "His stories always started with 'when I was your age'",
+            "She made crossing yourself look like a dance",
+            "He wore the same cologne for forty years",
+            "Her laugh started in her belly",
+            "He gave me his watch the day I graduated",
+            "She talked to plants like they were children",
+            "His secret was always adding more garlic",
+            "She kept tissues in her sleeve",
+            "He knew how to be silent in exactly the right way",
+            "She collected spoons from every place we traveled",
+            "He drew little cartoons on my lunch napkins",
+            "Her rocking chair creaked the same way every time",
+            "He never learned to text but wrote letters every week",
+            "She made me practice piano even when I complained",
+            "His car always smelled like peppermints",
+            "She braided my hair while telling stories",
+            "He let me steer the car in empty parking lots",
+            "Her jewelry box played the same song for decades",
+            "He taught me to skip stones at the lake",
+            "She ironed everything, even dish towels",
+            "His pockets were full of interesting things",
+            "She saved the wrapping paper from every gift",
+            "He knew how to make me feel brave",
+            "Her Sunday clothes smelled like mothballs",
+            "He built birdhouses that never stayed empty",
+            "She tasted everything she cooked with the same spoon",
+            "His handwriting was terrible but I could always read it",
+            "She clipped coupons she never used",
+            "He fell asleep during every movie",
+            "Her hugs smelled like Bengay and love",
+            "He taught me to fish with endless patience",
+            "She kept a running tab of who owed whom favors",
+            "His laugh lines were deeper than any frown",
+            "She made up words when she couldn't remember the real ones",
+            "He snored so loud the windows rattled",
+            "Her pie crust was always flaky, never soggy",
+            "He fixed things that weren't broken, just in case",
+            "She remembered everyone's birthday but her own",
+            "His advice was better than he knew",
+            "She left the porch light on until everyone was home",
+            "He pretended not to cry at weddings",
+            "Her pantry was organized like a military operation",
+            "He wore his heart on his weathered sleeve",
+            "She kept every card, every note, every scrap of memory",
+            "His hands knew exactly how to comfort",
+            "She made the sign of the cross over every departing car",
+            "He believed in me before I believed in myself",
+            "Her kitchen was never closed to anyone",
+            "He told me the truth even when it hurt",
+            "She saw the best in everyone, somehow",
+            "His shoulder was always available for tears",
+            "She danced in the kitchen when she thought no one watched",
+            "He taught me that love is shown, not just said",
+            "Her wisdom came wrapped in stories",
+            "He made the ordinary feel magical",
+            "She loved fiercely and without condition",
+            "His presence was a gift I didn't appreciate enough",
+            "She is the reason I know how to love"
+        ];
+
+        // Marigold flower class - now floating in the ambient background
+        class Marigold {
+            constructor(x, y) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || Math.random() * canvas.height;
+                this.size = Math.random() * 15 + 15;
+                this.petals = 8;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.005; // Slower rotation
+                this.pulsePhase = Math.random() * Math.PI * 2;
+                this.speedY = Math.random() * 0.12 + 0.03; // Much slower, more varied
+                this.speedX = (Math.random() - 0.5) * 0.15; // Gentler horizontal drift
+                this.opacity = Math.random() * 0.4 + 0.3;
+                this.message = messages[Math.floor(Math.random() * messages.length)];
+            }
+
+            update() {
+                this.y -= this.speedY;
+                this.x += this.speedX + Math.sin(this.y * 0.005) * 0.15; // Gentler drift
+                this.rotation += this.rotationSpeed;
+                this.pulsePhase += 0.015; // Slower pulse
+                
+                if (this.y < -50) {
+                    this.y = canvas.height + 50;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.globalAlpha = this.opacity;
+                
+                const pulse = Math.sin(this.pulsePhase) * 0.1 + 1;
+                
+                // Draw petals
+                for (let i = 0; i < this.petals; i++) {
+                    ctx.save();
+                    ctx.rotate((Math.PI * 2 * i) / this.petals);
+                    
+                    ctx.beginPath();
+                    ctx.ellipse(this.size * 0.4, 0, this.size * 0.5 * pulse, this.size * 0.3 * pulse, 0, 0, Math.PI * 2);
+                    
+                    const gradient = ctx.createRadialGradient(this.size * 0.4, 0, 0, this.size * 0.4, 0, this.size * 0.5);
+                    gradient.addColorStop(0, 'rgba(255, 180, 0, 1)');
+                    gradient.addColorStop(0.6, 'rgba(255, 140, 0, 0.9)');
+                    gradient.addColorStop(1, 'rgba(200, 100, 0, 0.6)');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                    ctx.restore();
+                }
+                
+                // Center
+                ctx.beginPath();
+                ctx.arc(0, 0, this.size * 0.3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(200, 100, 0, 1)';
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            contains(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size * 1.2;
+            }
+        }
+
+        // Papel Picado banner
+        class PapelPicado {
+            constructor(x, y, width, color) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = 40;
+                this.color = color;
+                this.swayPhase = Math.random() * Math.PI * 2;
+            }
+
+            draw() {
+                this.swayPhase += 0.03;
+                const sway = Math.sin(this.swayPhase) * 3;
+                
+                ctx.save();
+                ctx.translate(this.x + sway, this.y);
+                
+                // Banner rectangle
+                ctx.fillStyle = this.color;
+                ctx.fillRect(0, 0, this.width, this.height);
+                
+                // Cut-out pattern (simplified)
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                const numCuts = 5;
+                for (let i = 0; i < numCuts; i++) {
+                    const cutX = (i / numCuts) * this.width + this.width / (numCuts * 2);
+                    ctx.beginPath();
+                    ctx.arc(cutX, this.height * 0.3, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.beginPath();
+                    ctx.arc(cutX, this.height * 0.7, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Triangular bottom edge
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                for (let i = 0; i <= numCuts; i++) {
+                    const cutX = (i / numCuts) * this.width;
+                    if (i % 2 === 0) {
+                        ctx.lineTo(cutX, this.height);
+                    } else {
+                        ctx.lineTo(cutX, this.height + 10);
+                    }
+                }
+                ctx.lineTo(this.width, this.height);
+                ctx.lineTo(0, this.height);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            }
+        }
+
+        // Floating petal class
+        class FloatingPetal {
+            constructor(x, y) {
+                this.x = x || Math.random() * canvas.width;
+                this.y = y || Math.random() * canvas.height;
+                this.size = Math.random() * 15 + 10;
+                this.speedY = Math.random() * 0.15 + 0.05; // Much slower
+                this.speedX = (Math.random() - 0.5) * 0.2; // Gentler horizontal drift
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.01;
+                this.opacity = Math.random() * 0.4 + 0.3;
+                this.pulsePhase = Math.random() * Math.PI * 2;
+                this.message = messages[Math.floor(Math.random() * messages.length)];
+            }
+
+            update() {
+                this.y -= this.speedY;
+                this.x += this.speedX + Math.sin(this.y * 0.005) * 0.2; // Gentler sine wave
+                this.rotation += this.rotationSpeed;
+                this.pulsePhase += 0.015; // Slower pulse
+                
+                if (this.y < -50) {
+                    this.y = canvas.height + 50;
+                    this.x = Math.random() * canvas.width;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                
+                const pulse = Math.sin(this.pulsePhase) * 0.2 + 1;
+                const size = this.size * pulse;
+                
+                // Petal shape
+                ctx.beginPath();
+                ctx.ellipse(0, 0, size * 0.8, size, 0, 0, Math.PI * 2);
+                
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+                gradient.addColorStop(0, `rgba(255, 220, 100, ${this.opacity})`);
+                gradient.addColorStop(0.7, `rgba(255, 180, 50, ${this.opacity * 0.8})`);
+                gradient.addColorStop(1, `rgba(255, 150, 30, 0)`);
+                
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            contains(x, y) {
+                const dx = x - this.x;
+                const dy = y - this.y;
+                return Math.sqrt(dx * dx + dy * dy) < this.size * 1.5;
+            }
+        }
+
+        // Initialize
+        const petals = [];
+        const marigolds = [];
+        const papelPicado = [];
+
+        // Create petals and marigolds (mixed together)
+        for (let i = 0; i < 25; i++) {
+            petals.push(new FloatingPetal());
+        }
+
+        for (let i = 0; i < 15; i++) {
+            marigolds.push(new Marigold());
+        }
+
+        // Create papel picado banners
+        const colors = [
+            'rgba(255, 100, 150, 0.7)',
+            'rgba(100, 200, 255, 0.7)',
+            'rgba(150, 255, 100, 0.7)',
+            'rgba(255, 200, 100, 0.7)',
+            'rgba(200, 100, 255, 0.7)'
+        ];
+        
+        for (let i = 0; i < 10; i++) {
+            const x = (i / 10) * canvas.width + Math.random() * 50;
+            papelPicado.push(new PapelPicado(
+                x, 
+                30 + Math.random() * 60, 
+                70 + Math.random() * 50,
+                colors[i % colors.length]
+            ));
+        }
+
+        // Audio setup
+        function setupAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            musicGain = audioContext.createGain();
+            ambienceGain = audioContext.createGain();
+            
+            musicGain.connect(audioContext.destination);
+            ambienceGain.connect(audioContext.destination);
+            
+            musicGain.gain.value = 0.15; // Music in the distance
+            ambienceGain.gain.value = 0.4; // Ambience more prominent
+            
+            // Create music (soft guitar-like tones)
+            createMusic();
+            
+            // Create ambient sounds
+            createAmbience();
+        }
+
+        function createMusic() {
+            // Pentatonic scale for a Mexican folk feel
+            const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; // C, D, E, G, A, C
+            
+            function playNote() {
+                if (!started) return;
+                
+                const osc = audioContext.createOscillator();
+                const noteGain = audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.value = scale[Math.floor(Math.random() * scale.length)];
+                
+                noteGain.gain.value = 0;
+                noteGain.gain.linearRampToValueAtTime(0.03, audioContext.currentTime + 0.1);
+                noteGain.gain.linearRampToValueAtTime(0, audioContext.currentTime + 2);
+                
+                osc.connect(noteGain);
+                noteGain.connect(musicGain);
+                
+                osc.start(audioContext.currentTime);
+                osc.stop(audioContext.currentTime + 2);
+                
+                setTimeout(playNote, Math.random() * 3000 + 2000);
+            }
+            
+            playNote();
+        }
+
+        function createAmbience() {
+            // Gentle wind/night sounds
+            const bufferSize = audioContext.sampleRate * 2;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.02;
+            }
+            
+            function playAmbience() {
+                if (!started) return;
+                
+                const source = audioContext.createBufferSource();
+                const filter = audioContext.createBiquadFilter();
+                
+                source.buffer = buffer;
+                filter.type = 'lowpass';
+                filter.frequency.value = 400;
+                
+                source.connect(filter);
+                filter.connect(ambienceGain);
+                
+                source.start(audioContext.currentTime);
+                source.stop(audioContext.currentTime + 2);
+                
+                setTimeout(playAmbience, 1800);
+            }
+            
+            playAmbience();
+        }
+
+        // Show petal message
+        let currentlyShowing = false;
+        function showPetalMessage(message) {
+            if (currentlyShowing) return;
+            currentlyShowing = true;
+            
+            petalMessageEl.innerHTML = `<p>${message}</p>`;
+            petalMessageEl.classList.add('show');
+            
+            setTimeout(() => {
+                petalMessageEl.classList.remove('show');
+                setTimeout(() => {
+                    currentlyShowing = false;
+                }, 500);
+            }, 3000);
+        }
+
+        // Click handler - click anywhere to see a message
+        canvas.addEventListener('click', (e) => {
+            if (!started) return;
+            
+            // Pick a random message
+            const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            showPetalMessage(randomMessage);
+        });
+
+        // Start button
+        startButton.addEventListener('click', () => {
+            started = true;
+            introScreen.classList.add('hidden');
+            setupAudio();
+        });
+
+        // Animation loop
+        function animate() {
+            // Gradient background with subtle shift
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#1a0a2e');
+            gradient.addColorStop(0.5, '#3d2463');
+            gradient.addColorStop(1, '#5c3d7a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            if (started) {
+                // Draw papel picado in background
+                papelPicado.forEach(banner => banner.draw());
+                
+                // Draw and update petals
+                petals.forEach(petal => {
+                    petal.update();
+                    petal.draw();
+                });
+                
+                // Draw and update marigolds
+                marigolds.forEach(marigold => {
+                    marigold.update();
+                    marigold.draw();
+                });
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
